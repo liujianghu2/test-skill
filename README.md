@@ -225,15 +225,6 @@ data/
     snapshots/   每个 Skill 的时间戳快照（最多 3 份/个）
 .runtime/        一键脚本下载的便携 Node（可随时删除）
 ```
-
-**误删或写坏了也能救回来（三重）：**
-
-1. **Skill 快照** —— 每次导入/编辑 Skill 时，正文会在 `data/skills/snapshots/<id>/<时间>.md` 留一份纯文本快照（每个 Skill 最多 3 份）。
-2. **配置备份** —— 每次保存 `config.json` 前，把上一版复制到 `data/backup/config-<时间>.json`（最多 5 份）。API Key 只有你手工输入的这一份，改坏了能从这儿翻回去。
-3. **索引自愈** —— `data/skills/index.json` 丢失或损坏时，启动会自动扫描 `skills/*.md` 重建索引（日志打印「索引缺失，已从磁盘恢复 N 个 Skill」），Skill 不会静默消失。
-
-即使整个 `data/` 被删掉，Windows 上一般还在回收站，右键还原即可（本工具的资料就是这些纯文本文件）。想彻底避开项目目录里的清理动作，可以把数据放到项目外：`npm start -- --data D:\skill-lab-data`
-
 - API Key 通过接口回传时默认打码（`sk-t••••••7890`），界面拿到的是打码值，保存时不会用打码值覆盖真实 Key；需要明文时用 `GET /api/config?reveal=1`。
 - 服务默认只监听 `127.0.0.1`。如果改成 `0.0.0.0`，同网段的人就能读到你的配置，不要这么做。
 - `/api/file` 与 `/api/skills/:id/attach` 只允许读取已导入 Skill 目录内的文件。
@@ -276,7 +267,7 @@ npm run preview     # 把真实接口返回渲染成静态页，用于视觉检�
 ## 目录结构
 
 ```
-start.bat / start.ps1 / start.sh   一键启动脚本（含便携 Node 引导）
+启动.bat / start.ps1 / start.sh   一键启动脚本（含便携 Node 引导）
 bin/skill-lab.mjs      启动入口（参数解析、浏览器打开、优雅退出）
 src/server.mjs         HTTP 服务：静态资源 + JSON API + NDJSON 流式测试 + 附件接口
 src/providers.mjs      模型适配层（openai / anthropic / gemini / image，含多模态内容块）
@@ -297,7 +288,7 @@ scripts/               测试与开发辅助脚本
 
 ## 常见问题
 
-**双击 start.bat 后卡在下载 ——** 首次需要访问 `nodejs.org`；公司网络或代理可能拦截。可以手动装 Node.js 18.17+ 后重试，或设好代理后运行 `start.ps1 -Rebuild`。
+**双击 启动.bat 后卡在下载 ——** 首次需要访问 `nodejs.org`；公司网络或代理可能拦截。可以手动装 Node.js 18.17+ 后重试，或设好代理后运行 `start.ps1 -Rebuild`。
 
 **导入 GitHub 私有仓库失败 ——** 在「设置」里填 Git 访问令牌（GitHub 用 `ghp_…`，只需 `repo` 只读权限）。
 
