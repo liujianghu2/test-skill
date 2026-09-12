@@ -7,6 +7,7 @@
 - **一键启动脚本自带 Node 运行时**：没装 Node 的机器也能直接跑
 - API Key 只存在本机 `data/config.json`，不上传任何地方
 
+![alt Skill Lab页面](public/test.png)
 ---
 
 ## 快速开始
