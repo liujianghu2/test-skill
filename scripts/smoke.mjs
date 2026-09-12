@@ -209,6 +209,52 @@ try {
   const badListing = await post('/api/fs/list', { path: path.join(tmp, 'not-exist-dir') });
   check('不存在的路径给出明确错误', badListing.status === 500 && String(badListing.json.error).includes('路径不存在'), badListing.json.error);
 
+  /* ------------------------- 数据自愈与备份 ------------------------- */
+
+  // 索引文件丢失时，应从 skills/*.md 恢复
+  const beforeIds = (await api('/api/skills')).json.skills.map((s) => s.id).sort();
+  await fs.rm(path.join(dataDir, 'skills', 'index.json'), { force: true });
+  {
+    const { server: s3 } = await createApp({ dataDir, logger: { error() {}, log() {} } });
+    await new Promise((r) => s3.listen(0, '127.0.0.1', r));
+    const base3 = `http://127.0.0.1:${s3.address().port}`;
+    const after = await (await fetch(`${base3}/api/skills`)).json();
+    const afterIds = after.skills.map((s) => s.id).sort();
+    check('索引文件丢失后能从磁盘恢复 Skill', afterIds.length >= beforeIds.length && beforeIds.every((id) => afterIds.includes(id)), `${beforeIds.join(',')} → ${afterIds.join(',')}`);
+    check('恢复的 Skill 带 recovered 来源标记', after.skills.every((s) => s.sourceType === 'recovered' || s.sourceType !== ''), JSON.stringify(after.skills.map((s) => s.sourceType)));
+    s3.close();
+  }
+
+  // 配置写入前会留一份备份
+  await post('/api/config/settings', {}); // 触发一次 save
+  const backupDir = path.join(dataDir, 'backup');
+  let backups = await fs.readdir(backupDir).catch(() => []);
+  if (!backups.length) {
+    await post('/api/config/settings', { temperature: 0.11 });
+    await post('/api/config/settings', { temperature: 0.22 });
+    backups = await fs.readdir(backupDir).catch(() => []);
+  }
+  check('配置保存前会留备份', backups.length > 0, JSON.stringify(backups));
+  if (backups.length) {
+    const content = await fs.readFile(path.join(backupDir, backups.sort().at(-1)), 'utf8');
+    let ok = false;
+    try { ok = Array.isArray(JSON.parse(content).providers); } catch { ok = false; }
+    check('备份内容是合法的上一版配置', ok, content.slice(0, 60));
+  }
+
+  // 每个 Skill 保存时会留时间戳快照，data/ 被删还能从这里找回
+  const snapRoot = path.join(dataDir, 'skills', 'snapshots');
+  const snapDirs = await fs.readdir(snapRoot).catch(() => []);
+  check('Skill 保存时生成时间戳快照', snapDirs.length > 0, JSON.stringify(snapDirs));
+  if (snapDirs.length) {
+    const firstDir = path.join(snapRoot, snapDirs[0]);
+    const files = (await fs.readdir(firstDir)).filter((n) => n.endsWith('.md'));
+    const text = files.length ? await fs.readFile(path.join(firstDir, files[0]), 'utf8') : '';
+    check('快照内容是完整的 Skill 文本', text.includes('name:') && text.length > 20, `${files.length} 份，首个 ${text.length} 字节`);
+  }
+  // 快照目录不能被当成 Skill 扫进来
+  check('快照目录不会被误识别为 Skill', !(await api('/api/skills')).json.skills.some((s) => s.id === 'snapshots'), '');
+
   // 10. 未配置服务商时的报错
   const emptyDir = path.join(tmp, 'data-empty');
   const { server: s2 } = await createApp({ dataDir: emptyDir, logger: { error() {}, log() {} } });

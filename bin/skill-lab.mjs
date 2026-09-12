@@ -55,7 +55,16 @@ const { server, config } = await createApp({ dataDir: opts.dataDir });
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`\n端口 ${opts.port} 已被占用。换一个端口：node bin/skill-lab.mjs --port ${opts.port + 1}\n`);
+    const url = `http://${opts.host === '0.0.0.0' ? '127.0.0.1' : opts.host}:${opts.port}`;
+    console.error(`\n端口 ${opts.port} 已被占用。`);
+    console.error(`  如果 Skill Lab 已经在运行，直接打开： ${url}`);
+    console.error(`  想再开一个实例，换端口：node bin/skill-lab.mjs --port ${opts.port + 1}\n`);
+    if (opts.open) {
+      console.error('  已为你打开现有实例的页面…');
+      openBrowser(url);
+      setTimeout(() => process.exit(0), 1200);
+      return;
+    }
   } else {
     console.error('服务启动失败：', err);
   }
@@ -72,19 +81,40 @@ server.listen(opts.port, opts.host, () => {
   数据目录   ${opts.dataDir}
   模型服务   ${providers ? `${providers} 个已配置` : '尚未配置（在界面左侧添加）'}
   ────────────────────────────────────────────
-  按 Ctrl+C 退出
+  ${opts.open ? '正在打开浏览器…' : '按 Ctrl+C 退出'}
 `);
   if (opts.open) openBrowser(url);
 });
 
+/**
+ * 用系统默认浏览器打开地址。
+ * Windows 下依次尝试几种方式：某些环境里 `cmd start` 会被策略拦住，
+ * 这时用 PowerShell / rundll32 兜底。
+ */
 function openBrowser(url) {
-  const platform = process.platform;
-  const cmd = platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
-    : platform === 'darwin' ? ['open', [url]]
-    : ['xdg-open', [url]];
-  try {
-    spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
-  } catch { /* 打不开就算了 */ }
+  const attempts = process.platform === 'win32'
+    ? [
+      ['cmd', ['/c', 'start', '', url]],
+      ['powershell', ['-NoProfile', '-NonInteractive', '-Command', `Start-Process '${url}'`]],
+      ['rundll32', ['url.dll,FileProtocolHandler', url]],
+    ]
+    : process.platform === 'darwin'
+      ? [['open', [url]]]
+      : [['xdg-open', [url]], ['gio', ['open', url]], ['sensible-browser', [url]]];
+
+  let index = 0;
+  const tryNext = () => {
+    if (index >= attempts.length) return;
+    const [cmd, args] = attempts[index++];
+    try {
+      const child = spawn(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true });
+      child.on('error', tryNext);
+      child.unref();
+    } catch {
+      tryNext();
+    }
+  };
+  tryNext();
 }
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

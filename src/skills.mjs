@@ -37,6 +37,8 @@ export class SkillsStore {
     } catch (err) {
       if (err.code !== 'ENOENT') console.error('[skills] 索引读取失败：', err.message);
     }
+    // 索引丢失/不完整时，用目录里的 .md 兜底恢复
+    await this.#repairFromDisk();
   }
 
   async #readSkill(entry) {
@@ -66,6 +68,38 @@ export class SkillsStore {
       origin: s.origin,
     }));
     await fs.writeFile(this.indexFile, JSON.stringify({ version: 1, skills }, null, 2), 'utf8');
+  }
+
+  /**
+   * 兜底自愈：索引里没有、但目录里存在的 .md，重新纳入索引。
+   * 覆盖「索引文件写坏 / 被单独删掉」的情况，避免 Skill 静默消失。
+   */
+  async #repairFromDisk() {
+    const files = (await fs.readdir(this.dir).catch(() => []))
+      .filter((n) => /\.(md|markdown)$/i.test(n));
+    let added = 0;
+    for (const file of files) {
+      const id = file.replace(/\.(md|markdown)$/i, '');
+      if (this.items.has(id)) continue;
+      try {
+        const raw = await fs.readFile(path.join(this.dir, file), 'utf8');
+        const skill = parseSkillText(raw, {
+          id,
+          sourceType: 'recovered',
+          source: `（从磁盘恢复：${file}）`,
+          dir: '',
+          files: [],
+        });
+        skill.origin = { kind: 'local-file', path: path.join(this.dir, file), recovered: true };
+        this.items.set(id, skill);
+        added++;
+      } catch { /* 跳过读不了的文件 */ }
+    }
+    if (added) {
+      console.log(`[skills] 索引缺失，已从磁盘恢复 ${added} 个 Skill`);
+      await this.#persist();
+    }
+    return added;
   }
 
   list() {
@@ -102,9 +136,27 @@ export class SkillsStore {
 
   async #save(skill) {
     await fs.writeFile(path.join(this.dir, `${skill.id}.md`), skill.raw, 'utf8');
+    await this.#snapshot(skill.id, skill.raw);
     this.items.set(skill.id, skill);
     await this.#persist();
     return skill;
+  }
+
+  /**
+   * 给每个 Skill 留一份时间戳快照（最多 3 份/个）。
+   * data/ 被误删时，除了回收站，这里还有一份可读的纯文本备份。
+   */
+  async #snapshot(id, raw) {
+    try {
+      const dir = path.join(this.dir, 'snapshots', id);
+      await fs.mkdir(dir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      await fs.writeFile(path.join(dir, `${stamp}.md`), raw, 'utf8');
+      const files = (await fs.readdir(dir)).filter((n) => n.endsWith('.md')).sort();
+      for (const old of files.slice(0, Math.max(0, files.length - 3))) {
+        await fs.rm(path.join(dir, old), { force: true });
+      }
+    } catch { /* 快照失败不影响主流程 */ }
   }
 
   async remove(id) {
@@ -309,6 +361,7 @@ export class SkillsStore {
     };
     next.raw = serializeSkill(next);
     await fs.writeFile(path.join(this.dir, `${id}.md`), next.raw, 'utf8');
+    await this.#snapshot(id, next.raw);
     this.items.set(id, next);
     await this.#persist();
     return next;

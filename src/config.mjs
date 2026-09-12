@@ -36,8 +36,29 @@ export class ConfigStore {
   }
 
   async save() {
-    await fs.writeFile(this.file, JSON.stringify(this.data, null, 2), 'utf8');
+    const json = JSON.stringify(this.data, null, 2);
+    // 每次覆盖前留一份上一版：配置（含 API Key）是用户手工填的唯一副本，误删/写坏要能救回来
+    await this.#backup(json);
+    await fs.writeFile(this.file, json, 'utf8');
     try { await fs.chmod(this.file, 0o600); } catch { /* Windows 上忽略 */ }
+  }
+
+  /** 把当前磁盘上的配置复制到 backup/ 目录，最多保留 5 份。 */
+  async #backup(incoming) {
+    try {
+      const current = await fs.readFile(this.file, 'utf8').catch(() => '');
+      if (!current || current === incoming) return;
+      const backupDir = path.join(this.dir, 'backup');
+      await fs.mkdir(backupDir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      await fs.writeFile(path.join(backupDir, `config-${stamp}.json`), current, 'utf8');
+      const files = (await fs.readdir(backupDir))
+        .filter((n) => /^config-.*\.json$/.test(n))
+        .sort();
+      for (const old of files.slice(0, Math.max(0, files.length - 5))) {
+        await fs.rm(path.join(backupDir, old), { force: true });
+      }
+    } catch { /* 备份失败不能影响主流程 */ }
   }
 
   /** 返回给前端时默认打码 API Key。 */

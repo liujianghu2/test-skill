@@ -9,19 +9,29 @@
 # 可选参数：
 #   -Port 5178      指定端口
 #   -NoOpen         不自动打开浏览器
+#   -Open           自动打开浏览器（双击 .bat 时传入）
 #   -Rebuild        忽略已下载的运行时，重新下载
 
 param(
     [int]$Port = 5177,
     [switch]$NoOpen,
-    [switch]$Rebuild
+    [switch]$Rebuild,
+    [switch]$Open
 )
+
+# 中文输出需要 UTF-8 控制台，否则在 GBK 代码页下会乱码
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+} catch { /* 忽略 */ }
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeDir = Join-Path $root '.runtime'
 $nodeDir = Join-Path $runtimeDir 'node'
 $nodeExe = Join-Path $nodeDir 'node.exe'
+# -Open（.bat 双击时传入）与「默认打开浏览器」等价
+if ($Open) { $NoOpen = $false }
 
 function Write-Step($msg) { Write-Host "  $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "  $msg" -ForegroundColor Green }

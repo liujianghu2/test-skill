@@ -106,9 +106,6 @@ metadata:                            # 支持一层嵌套
 # 正文会完整注入 system prompt
 ```
 
-没有 frontmatter 时，用第一个标题猜 `name`、首段猜 `description`。
-导入后每条 Skill 都带来源记录，列表里的 `↻` 可以重新拉取最新内容。
-
 ---
 
 ## 附件：给需要文件的 Skill 喂输入
@@ -169,20 +166,35 @@ metadata:                            # 支持一层嵌套
 
 ## 一键启动与环境问题
 
+**最省事的用法：双击项目根目录的 `启动.bat`（或 `start.bat`）。**
+
+它会自动完成：检测/准备 Node 运行时 → 启动服务 → **用默认浏览器打开界面**。第一次运行如果本机没有 Node，会先自动下载便携版（约 30MB），之后的启动都是秒开。
+
 | 文件 | 平台 | 说明 |
 | --- | --- | --- |
-| `start.bat` | Windows | 双击即可；自动调用 PowerShell 脚本 |
+| `启动.bat` / `start.bat` | Windows | **双击即可**，启动后自动打开浏览器（两个文件等价，取你顺手的那个） |
 | `start.ps1` | Windows | 真正的启动逻辑：检测/下载便携 Node，再启动服务 |
 | `start.sh` | macOS / Linux | 需要系统已装 Node 18.17+ |
+
+命令行等价写法：
+
+```bash
+npm start -- --open        # 启动并打开浏览器
+node bin/skill-lab.mjs --open
+```
 
 `start.ps1` 的行为：
 
 1. 先看项目内 `.runtime/node/node.exe` 是否存在 → 直接用
 2. 否则看系统 `node` 是否 ≥ 18.17 → 满足则用系统的
 3. 都不满足 → 从 `https://nodejs.org/dist/index.json` 取最新 LTS，下载 `node-<ver>-win-<arch>.zip`（优先用系统自带 `curl.exe`），解压到 `.runtime/node`
-4. 启动 `bin/skill-lab.mjs --port 5177 --open`
+4. 启动 `bin/skill-lab.mjs --port 5177 --open`（`--open` 会用系统默认浏览器打开界面；Windows 上依次尝试 `cmd start` / PowerShell / `rundll32`，避免被策略拦住）
 
-参数：`-Port 5178` 换端口、`-NoOpen` 不打开浏览器、`-Rebuild` 强制重新下载运行时。
+参数：`-Port 5178` 换端口、`-NoOpen` 不打开浏览器、`-Open` 强制打开、`-Rebuild` 强制重新下载运行时。
+
+**端口被占用时**：不会静默失败 —— 会提示「Skill Lab 可能已经在运行」，并（在自动打开模式下）直接为你打开现有实例的页面。
+
+**关掉服务**：关掉那个命令行窗口，或在窗口里按 `Ctrl+C`。
 
 > 代码用到内置 `fetch`，因此 **最低 Node 18.17**；脚本会拦住更低版本并自动处理。
 
@@ -207,9 +219,19 @@ node bin/skill-lab.mjs [选项]
 ```
 data/
   config.json    模型服务配置（含 API Key，文件权限 0600）
-  skills/        导入的 Skill 正文与索引
+  backup/        config.json 的历史版本（每次保存前留一份，最多 5 份）
+  skills/        导入的 Skill 正文与索引（index.json）
+    snapshots/   每个 Skill 的时间戳快照（最多 3 份/个）
 .runtime/        一键脚本下载的便携 Node（可随时删除）
 ```
+
+**误删或写坏了也能救回来（三重）：**
+
+1. **Skill 快照** —— 每次导入/编辑 Skill 时，正文会在 `data/skills/snapshots/<id>/<时间>.md` 留一份纯文本快照（每个 Skill 最多 3 份）。
+2. **配置备份** —— 每次保存 `config.json` 前，把上一版复制到 `data/backup/config-<时间>.json`（最多 5 份）。API Key 只有你手工输入的这一份，改坏了能从这儿翻回去。
+3. **索引自愈** —— `data/skills/index.json` 丢失或损坏时，启动会自动扫描 `skills/*.md` 重建索引（日志打印「索引缺失，已从磁盘恢复 N 个 Skill」），Skill 不会静默消失。
+
+即使整个 `data/` 被删掉，Windows 上一般还在回收站，右键还原即可（本工具的资料就是这些纯文本文件）。想彻底避开项目目录里的清理动作，可以把数据放到项目外：`npm start -- --data D:\skill-lab-data`
 
 - API Key 通过接口回传时默认打码（`sk-t••••••7890`），界面拿到的是打码值，保存时不会用打码值覆盖真实 Key；需要明文时用 `GET /api/config?reveal=1`。
 - 服务默认只监听 `127.0.0.1`。如果改成 `0.0.0.0`，同网段的人就能读到你的配置，不要这么做。
@@ -222,14 +244,14 @@ data/
 ## 测试与自检
 
 ```bash
-npm test          # 四套测试一起跑（154 项）
+npm test          # 四套测试一起跑（179 项）
 ```
 
 | 命令 | 覆盖范围 |
 | --- | --- |
 | `npm run test:md` | Markdown 渲染器 16 项：表格、代码块、列表、引用、URL 含 `&` 的图片/链接、data URL、HTML 转义、软换行、图片抽取 |
 | `npm run test:stream` | **流式渲染器与一次性渲染对拍 42 项**：同一段文本按 2/3/5/7 字符与逐字符喂入，最终 DOM 结构必须与 `renderMarkdown` 完全一致；另有表格节点复用、代码块就地增长、半行预览与收尾转正 |
-| `npm run test:api` | 后端 52 项：配置读写与打码、Skill 解析与导入、附件读取与上传（multipart）、附件大小上限、**本地目录浏览（SKILL.md 识别、hasSkill/hasSkillChild、批量导入列表、文件路径回落、错误路径）**、路径越权防护、静态资源 |
+| `npm run test:api` | 后端 59 项：配置读写与打码、**配置备份、Skill 快照、索引丢失自愈**、Skill 解析与导入、附件读取与上传（multipart）、附件大小上限、**本地目录浏览（SKILL.md 识别、hasSkill/hasSkillChild、批量导入列表、文件路径回落、错误路径）**、路径越权防护、静态资源 |
 | `npm run test:e2e` | 端到端 62 项：三种协议的真实请求/流式解析、Skill 是否真的进入请求、附件按协议转成多模态格式、工具调用分片拼接、模式对照、错误上报、SSE 兼容回归 |
 
 **浏览器布局自检**（需要本机有 Chrome/Edge）：

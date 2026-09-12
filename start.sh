@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Skill Lab 一键启动（macOS / Linux）
+# Skill Lab一键启动（macOS / Linux）
 # 需要 Node.js 18.17+（内置 fetch）。没有的话会提示安装方式。
 
 set -e
