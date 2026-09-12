@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skill Lab · 本地 Skill 测试工具</title>
+<link rel="stylesheet" href="/styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M10 21l6-11 6 11' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+<div id="app">
+  <aside class="rail">
+    <div class="rail-top">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor" opacity=".14"/><path d="M10 21l6-11 6 11" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Skill Lab</span>
+      </div>
+    </div>
+    <nav class="rail-nav">
+      <button class="nav-item active" data-pane="skills" title="Skill 库">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v15H6.5A2.5 2.5 0 004 20.5V5.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 18v3H6.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>Skill</span>
+      </button>
+      <button class="nav-item" data-pane="providers" title="模型服务">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 3v3M12 18v3M4.9 7.5l2.6 1.5M16.5 15l2.6 1.5M4.9 16.5l2.6-1.5M16.5 9l2.6-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>模型</span>
+      </button>
+      <button class="nav-item" data-pane="runs" title="测试记录">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>记录</span>
+      </button>
+      <button class="nav-item" data-pane="settings" title="设置">
+        <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.8l1 2.2 2.4-.6 1.4 2-1.6 1.9 1.6 1.9-1.4 2-2.4-.6-1 2.2h-2.4l-1-2.2-2.4.6-1.4-2 1.6-1.9L4.6 6.4l1.4-2 2.4.6 1-2.2H12z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span>设置</span>
+      </button>
+    </nav>
+    <div class="rail-foot">
+      <span class="dot" id="health-dot" title="服务状态"></span>
+      <span id="health-text">连接中</span>
+    </div>
+  </aside>
+
+  <section class="panel" id="panel">
+    <!-- Skill 面板 -->
+    <div class="pane active" data-pane="skills">
+      <header class="panel-head">
+        <h2>Skill 库</h2>
+        <span class="chip" id="skill-count">0</span>
+      </header>
+      <div class="panel-body">
+        <div class="import-tabs" role="tablist">
+          <button class="tab active" data-tab="git">Git 仓库</button>
+          <button class="tab" data-tab="local">本地路径</button>
+          <button class="tab" data-tab="paste">粘贴</button>
+        </div>
+
+        <div class="tabpane active" data-tab="git">
+          <input id="git-url" class="input" type="text" placeholder="https://github.com/user/repo 或 …/tree/main/skills/foo" />
+          <div class="row">
+            <button class="btn primary" id="btn-import-git">导入仓库</button>
+            <span class="hint">自动定位 SKILL.md</span>
+          </div>
+        </div>
+
+        <div class="tabpane" data-tab="local">
+          <input id="local-path" class="input" type="text" placeholder="E:\path\to\skill 或 …\SKILL.md" />
+          <div class="row">
+            <button class="btn primary" id="btn-import-local">导入</button>
+            <button class="btn" id="btn-browse-local" title="打开选择器挑选本地 Skill">浏览…</button>
+          </div>
+          <div class="row">
+            <button class="btn ghost sm" id="btn-browse-folder" title="用系统文件夹选择器（仅 Chromium 内核支持）">系统文件夹选择器</button>
+          </div>
+          <div class="recent" id="recent-paths"></div>
+          <span class="hint">导入目录、SKILL.md，或单个 .md 文件</span>
+        </div>
+
+        <div class="tabpane" data-tab="paste">
+          <input id="paste-name" class="input" type="text" placeholder="名称（可选）" />
+          <textarea id="paste-text" class="input mono" rows="7" placeholder="粘贴 SKILL.md 内容，含 --- frontmatter ---"></textarea>
+          <div class="row">
+            <button class="btn primary" id="btn-import-paste">保存为 Skill</button>
+          </div>
+        </div>
+
+        <div class="list-head">
+          <span>已导入</span>
+          <input id="skill-filter" class="input tiny" type="search" placeholder="筛选…" />
+        </div>
+        <ul class="list" id="skill-list"></ul>
+      </div>
+    </div>
+
+    <!-- 模型面板 -->
+    <div class="pane" data-pane="providers">
+      <header class="panel-head">
+        <h2>模型服务</h2>
+        <button class="btn ghost sm" id="btn-new-provider">+ 新增</button>
+      </header>
+      <div class="panel-body">
+        <ul class="list" id="provider-list"></ul>
+        <div class="editor" id="provider-editor" hidden>
+          <div class="editor-head">
+            <strong id="editor-title">新增服务商</strong>
+            <button class="btn ghost sm" id="btn-close-editor">收起</button>
+          </div>
+          <label class="field">
+            <span>预设</span>
+            <select id="p-preset" class="input"></select>
+          </label>
+          <label class="field">
+            <span>名称</span>
+            <input id="p-name" class="input" type="text" placeholder="显示名称" />
+          </label>
+          <label class="field">
+            <span>协议</span>
+            <select id="p-protocol" class="input">
+              <option value="openai">OpenAI 兼容 /chat/completions</option>
+              <option value="anthropic">Anthropic /messages</option>
+              <option value="gemini">Google /generateContent</option>
+              <option value="image">图片生成 /images/generations</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Base URL</span>
+            <input id="p-baseurl" class="input mono" type="text" placeholder="https://api.openai.com/v1" />
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input id="p-apikey" class="input mono" type="password" placeholder="sk-…" autocomplete="off" />
+          </label>
+          <div class="field">
+            <span>模型</span>
+            <div class="chips" id="p-models"></div>
+            <div class="row">
+              <input id="p-newmodel" class="input tiny mono" type="text" placeholder="填入模型名后回车" />
+              <button class="btn sm" id="btn-add-model">添加</button>
+              <button class="btn sm" id="btn-fetch-models">拉取列表</button>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="btn-save-provider">保存</button>
+            <button class="btn" id="btn-test-provider">测试连通</button>
+            <button class="btn danger-ghost" id="btn-delete-provider">删除</button>
+          </div>
+          <div class="notice" id="provider-note" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 记录面板 -->
+    <div class="pane" data-pane="runs">
+      <header class="panel-head">
+        <h2>测试记录</h2>
+        <button class="btn ghost sm" id="btn-clear-runs">清空</button>
+      </header>
+      <div class="panel-body">
+        <ul class="list" id="run-list"></ul>
+      </div>
+    </div>
+
+    <!-- 设置面板 -->
+    <div class="pane" data-pane="settings">
+      <header class="panel-head"><h2>设置</h2></header>
+      <div class="panel-body">
+        <label class="field">
+          <span>Git 访问令牌（私有仓库需要）</span>
+          <input id="s-gittoken" class="input mono" type="password" placeholder="ghp_… 留空表示公开仓库" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>默认温度</span>
+          <input id="s-temp" class="input" type="number" min="0" max="2" step="0.1" />
+        </label>
+        <label class="field">
+          <span>默认最大输出 Token</span>
+          <input id="s-maxtokens" class="input" type="number" min="1" step="128" />
+        </label>
+        <label class="field">
+          <span>附加系统提示（每次测试都追加）</span>
+          <textarea id="s-systemextra" class="input" rows="4" placeholder="例如：请先输出你的思考要点"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-save-settings">保存设置</button>
+        </div>
+        <div class="meta-box" id="env-info"></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="main">
+    <header class="main-head">
+      <div class="crumbs">
+        <span class="crumb-label">Skill</span>
+        <select id="m-skill" class="input compact"></select>
+      </div>
+      <div class="crumbs">
+        <span class="crumb-label">模型</span>
+        <select id="m-provider" class="input compact"></select>
+        <select id="m-model" class="input compact"></select>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="btn-view-skill" title="查看将被注入的 system prompt">查看提示词</button>
+      <button class="btn ghost sm" id="btn-copy-answer" title="复制最后一条回答">复制回答</button>
+      <button class="btn ghost sm" id="btn-clear-stage" title="清空当前输出">清空</button>
+    </header>
+
+    <section class="stage" id="stage">
+      <div class="empty-state" id="empty-state">
+        <svg viewBox="0 0 48 48" width="52" height="52" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 22h6M14 28h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="33" cy="22" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <p>选择 Skill 与模型，输入内容开始测试</p>
+        <span class="hint">输出会实时呈现文本、Markdown 表格、图片、推理链与工具调用；需要文件输入的 Skill 可以直接拖拽文件进来</span>
+      </div>
+      <div class="turns" id="turns"></div>
+      <button class="jump-bottom" id="btn-jump-bottom" hidden>↓ 回到底部</button>
+    </section>
+
+    <footer class="composer" id="composer">
+      <div class="composer-inner">
+        <div class="attachments" id="attachments"></div>
+        <div class="composer-bar">
+          <div class="seg" id="mode-seg" role="group" aria-label="注入模式">
+            <button class="seg-item active" data-mode="instructions">注入 Skill</button>
+            <button class="seg-item" data-mode="raw">原始 SKILL.md</button>
+            <button class="seg-item" data-mode="none" title="完全不注入 Skill，作为基线对照">不使用</button>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn ghost sm" id="btn-attach" title="上传文件作为本次输入（也可直接拖拽到窗口，或粘贴文件）">＋ 文件</button>
+          <button class="btn ghost sm" id="btn-attach-path" title="直接读取本机某一路径的文件">本机路径</button>
+          <button class="btn ghost sm" id="btn-attach-skill-file" title="从当前 Skill 目录附带文件">从 Skill 选取</button>
+          <label class="inline-field" title="采样温度">
+            <span>温度</span>
+            <input id="i-temp" type="number" min="0" max="2" step="0.1" class="input mini" />
+          </label>
+          <label class="inline-field" title="最大输出 Token">
+            <span>最大 Token</span>
+            <input id="i-maxtokens" type="number" min="1" step="128" class="input mini" />
+          </label>
+          <button class="btn ghost sm" id="btn-stop" hidden>停止</button>
+          <button class="btn primary" id="btn-send" title="运行测试（Ctrl + Enter）">运行测试 <kbd>Ctrl</kbd><kbd>↵</kbd></button>
+        </div>
+        <textarea id="input" class="input composer-input" rows="1" placeholder="描述一个会让该 skill 发挥作用的请求；有文件时可直接拖进来或点「＋ 文件」"></textarea>
+      </div>
+      <input type="file" id="pick-files" class="pick-files" multiple />
+    </footer>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <strong id="modal-title">提示词预览</strong>
+      <button class="btn ghost sm" id="modal-close">关闭</button>
+    </header>
+    <div class="modal-body"><pre id="modal-body" class="mono"></pre></div>
+    <footer class="modal-foot">
+      <button class="btn sm" id="modal-copy">复制</button>
+    </footer>
+  </div>
+</div>
+
+<div class="modal" id="browser" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <strong>选择本地 Skill</strong>
+      <span class="hint">进入目录后点「导入当前目录」，或直接点某个 SKILL.md</span>
+      <button class="btn ghost sm" id="browser-close">关闭</button>
+    </header>
+    <div class="browser-bar">
+      <button class="btn sm" id="browser-up" title="上一层">↑ 上一层</button>
+      <input id="browser-path" class="input mono tiny" type="text" placeholder="直接输入路径后回车" />
+      <button class="btn sm" id="browser-go">前往</button>
+    </div>
+    <div class="browser-quick" id="browser-quick"></div>
+    <div class="modal-body">
+      <ul class="list" id="browser-list"></ul>
+    </div>
+    <footer class="modal-foot">
+      <span class="hint" id="browser-hint"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="browser-import-batch" hidden>批量导入</button>
+      <button class="btn primary" id="browser-import-here">导入当前目录</button>
+    </footer>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <img id="lightbox-img" alt="" />
+</div>
+
+<div class="toasts" id="toasts"></div>
+<script>
+/* 自检探针：通过 ?probe=1 打开时，运行结束后把关键布局状态写进 DOM，
+   便于用无头浏览器 --dump-dom 做自动化断言（对正常使用无任何影响）。 */
+(function () {
+  if (!new URLSearchParams(location.search).has('probe')) return;
+  const dump = (phase) => {
+    const stage = document.querySelector('#stage');
+    const app = document.querySelector('#app');
+    const turns = document.querySelector('#turns');
+    const last = turns?.lastElementChild;
+    const answer = last?.querySelector('.answer');
+    const probe = {
+      phase,
+      appHeight: app?.clientHeight ?? -1,
+      docScrolls: document.documentElement.scrollHeight > window.innerHeight + 2,
+      stageScrollable: !!stage && stage.scrollHeight > stage.clientHeight,
+      stageTop: stage ? Math.round(stage.scrollTop) : -1,
+      stageGap: stage ? Math.round(stage.scrollHeight - stage.scrollTop - stage.clientHeight) : -1,
+      turns: turns ? turns.children.length : -1,
+      answerLen: answer ? (answer.textContent || '').length : -1,
+      tables: answer ? answer.querySelectorAll('table').length : -1,
+      codes: answer ? answer.querySelectorAll('code').length : -1,
+      images: answer ? answer.querySelectorAll('img').length : -1,
+      sendDisabled: document.querySelector('#btn-send')?.disabled ?? null,
+      appHidden: app ? getComputedStyle(app).display : 'none',
+      composerBottom: (() => {
+        const c = document.querySelector('#composer');
+        if (!c) return -1;
+        return Math.round(window.innerHeight - c.getBoundingClientRect().bottom);
+      })(),
+      jumpVisible: !document.querySelector('#btn-jump-bottom')?.hidden,
+      inputValue: (document.querySelector('#input')?.value ?? '').length,
+      inputHeight: (() => { const i = document.querySelector('#input'); return i ? Math.round(i.getBoundingClientRect().height) : -1; })(),
+      inputWidth: (() => { const i = document.querySelector('#input'); const s = document.querySelector('#turns'); return i && s ? [Math.round(i.getBoundingClientRect().width), Math.round(s.getBoundingClientRect().width)] : [-1, -1]; })(),
+      attachChips: document.querySelectorAll('#attachments .attach-chip').length,
+      barHeight: (() => { const b = document.querySelector('.composer-bar'); return b ? Math.round(b.getBoundingClientRect().height) : -1; })(),
+    };
+    let el = document.querySelector('#probe-out');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'probe-out';
+      el.style.display = 'none';
+      document.body.append(el);
+    }
+    el.setAttribute(`data-${phase}`, JSON.stringify(probe));
+  };
+  window.__probe = dump;
+  // 用 rAF 轮询而不是 setInterval：无头模式的虚拟时间对定时器推进不可靠
+  let started = false;
+  let frames = 0;
+  const tick = () => {
+    frames++;
+    const disabled = document.querySelector('#btn-send')?.disabled;
+    if (disabled) started = true;
+    if (started && !disabled) dump('final');
+    if (!started && frames > 600) dump('final'); // 兜底：10s 仍没开始
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  window.addEventListener('load', () => setTimeout(() => dump('late'), 2500));
+  dump('start');
+})();
+</script>
+<script src="/app.js" type="module"></script>
+</body>
+</html>
