@@ -1,0 +1,26 @@
+{
+  "name": "skill-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地 Skill 测试工具：接入多家大模型 API，从 Git 仓库或本地目录导入 skill 并测试其能力输出",
+  "type": "module",
+  "bin": {
+    "skill-lab": "./bin/skill-lab.mjs"
+  },
+  "scripts": {
+    "start": "node bin/skill-lab.mjs",
+    "open": "node bin/skill-lab.mjs --open",
+    "demo": "node scripts/demo.mjs",
+    "test": "node scripts/md-test.mjs && node scripts/stream-test.mjs && node scripts/smoke.mjs && node scripts/e2e.mjs",
+    "test:md": "node scripts/md-test.mjs",
+    "test:stream": "node scripts/stream-test.mjs",
+    "test:api": "node scripts/smoke.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "ui": "node scripts/ui-probe.mjs",
+    "preview": "node scripts/build-preview.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {}
+}
